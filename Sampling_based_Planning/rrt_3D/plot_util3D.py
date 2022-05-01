@@ -27,6 +27,9 @@ def draw_block_list(ax, blocks, color=None, alpha=0.15):
     '''
     drawing the blocks on the graph
     '''
+    if not len(blocks):
+        return
+
     v = np.array([[0, 0, 0], [1, 0, 0], [1, 1, 0], [0, 1, 0], [0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 1, 1]],
                  dtype='float')
     f = np.array([[0, 1, 5, 4], [1, 2, 6, 5], [2, 3, 7, 6], [3, 0, 4, 7], [0, 1, 2, 3], [4, 5, 6, 7]])
