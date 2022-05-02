@@ -105,7 +105,7 @@ class rrt_connect():
 
 #----------RRT connect algorithm
     def CONNECT(self, Tree, q):
-        print('in connect')
+        # print('in connect')
         while True:
             S = self.EXTEND(Tree, q)
             if S != 'Advanced':
@@ -116,12 +116,12 @@ class rrt_connect():
         Tree_A = Tree(qinit)
         Tree_B = Tree(qgoal)
         for k in range(self.maxiter):
-            print(k)
+            # print(k)
             qrand = self.RANDOM_CONFIG()
             if self.EXTEND(Tree_A, qrand) != 'Trapped':
                 qnew = self.qnew # get qnew from outside
                 if self.CONNECT(Tree_B, qnew) == 'Reached':
-                    print('reached')
+                    # print('reached')
                     self.done = True
                     self.Path = self.PATH(Tree_A, Tree_B)
                     if visualize:
@@ -154,7 +154,7 @@ class rrt_connect():
             qnew = tree_b.Parent[qnew]
             if qnew == self.qinit or qnew == self.qgoal:
                 break
-        return patha + pathb
+        return list(reversed(patha)) + pathb
 
 #----------RRT connect algorithm        
     def visualization(self, tree_a, tree_b, index):
@@ -219,10 +219,12 @@ def triwise_overlap(iterable):
     next(c)
     return zip(a, b, c)
 
-def reduce_redundant_points(path):
+def remove_redundant_points(path):
     """
     mutates (modifies) the `path` variable, removes redundant points
     """
+    if len(path) <= 3:
+        return
     def angle(p1,p2):
         x1,y1,z1 = p1
         x2,y2,z2 = p2
@@ -231,11 +233,11 @@ def reduce_redundant_points(path):
         return np.arctan(dy/(dx + 0.00001*np.sign(dx)))
     indexes_to_remove = []
     for i,(p1,p2,p3) in enumerate(triwise_overlap(path)):
-        if np.abs(angle(p1,p2) - angle(p1,p3)) <= 15:
+        if np.abs(angle(p1,p2) - angle(p1,p3)) <= 5:
             indexes_to_remove.append(i+1)
 
     for i in reversed(indexes_to_remove):
-        print(i)
+        # print(i)
         del path[i]
 
 
@@ -249,9 +251,9 @@ def find_new_path(droneID,start,goal,env_config,active_paths,visualize=False):
     """
     #modify active paths 
     
-    DRONE_EXTENTS = 0.4
-    ZLAYER_HEIGHT = 1.0
-    PADDING = 0.2
+    DRONE_EXTENTS = 0.2
+    ZLAYER_HEIGHT = 0.5
+    PADDING = 0.1
     env_config = deepcopy(env_config)
 
     for droneId, path in active_paths.items():
@@ -273,11 +275,13 @@ def find_new_path(droneID,start,goal,env_config,active_paths,visualize=False):
     # create rrt connect class
     p = rrt_connect(start, goal, env_config)
     p.RRT_CONNECT_PLANNER(p.qinit, p.qgoal, visualize=visualize)
-    # print('path     :', p.Path)
-    coords_undupped = flatten(p.Path)
-    # print('pathundup:', coords_undupped)
-    active_paths[droneID] = coords_undupped
-    return coords_undupped
+    coords_flattened = flatten(p.Path)
+    # print('path     :', coords_flattened)
+    # coords_flattened = coords_flattened[2:-2]
+    remove_redundant_points(coords_flattened)
+    # print('pathundup:', coords_flattened)
+    active_paths[droneID] = coords_flattened
+    return coords_flattened
 
 if __name__ == '__main__':
     import argparse
@@ -296,21 +300,25 @@ if __name__ == '__main__':
 
 
     active_paths = {
-        0: [[5.862774675369044, 14.811551134482752, 1.0], [5.7252361071054585, 14.334534696199228, 1.0], [5.587697538841872, 13.857518257915702, 1.0], [5.450158970578285, 13.380501819632176, 1.0], [5.312620402314699, 12.90348538134865, 1.0], [5.175081834051113, 12.426468943065125, 1.0], [5.0375432657875265, 11.9494525047816, 1.0], [4.90000469752394, 11.472436066498075, 1.0], [4.762466129260353, 10.995419628214549, 1.0], [4.624927560996767, 10.518403189931025, 1.0], [4.48738899273318, 10.0413867516475, 1.0], [4.349850424469594, 9.564370313363977, 1.0], [4.212311856206007, 9.087353875080451, 1.0], [4.0747732879424206, 8.610337436796925, 1.0], [3.937234719678834, 8.1333209985134, 1.0], [3.7996961514152474, 7.6563045602298745, 1.0], [3.6621575831516613, 7.17928812194635, 1.0], [3.5246190148880747, 6.702271683662825, 1.0], [3.3870804466244886, 6.2252552453793, 1.0], [3.249541878360902, 5.748238807095775, 1.0], [3.1120033100973155, 5.27122236881225, 1.0], [2.9744647418337293, 4.794205930528725, 1.0], [2.836926173570143, 4.3171894922452, 1.0], [2.6993876053065566, 3.8401730539616756, 1.0], ],
+        # 0: [[5.862774675369044, 14.811551134482752, 1.0], [5.7252361071054585, 14.334534696199228, 1.0], [5.587697538841872, 13.857518257915702, 1.0], [5.450158970578285, 13.380501819632176, 1.0], [5.312620402314699, 12.90348538134865, 1.0], [5.175081834051113, 12.426468943065125, 1.0], [5.0375432657875265, 11.9494525047816, 1.0], [4.90000469752394, 11.472436066498075, 1.0], [4.762466129260353, 10.995419628214549, 1.0], [4.624927560996767, 10.518403189931025, 1.0], [4.48738899273318, 10.0413867516475, 1.0], [4.349850424469594, 9.564370313363977, 1.0], [4.212311856206007, 9.087353875080451, 1.0], [4.0747732879424206, 8.610337436796925, 1.0], [3.937234719678834, 8.1333209985134, 1.0], [3.7996961514152474, 7.6563045602298745, 1.0], [3.6621575831516613, 7.17928812194635, 1.0], [3.5246190148880747, 6.702271683662825, 1.0], [3.3870804466244886, 6.2252552453793, 1.0], [3.249541878360902, 5.748238807095775, 1.0], [3.1120033100973155, 5.27122236881225, 1.0], [2.9744647418337293, 4.794205930528725, 1.0], [2.836926173570143, 4.3171894922452, 1.0], [2.6993876053065566, 3.8401730539616756, 1.0], ],
     }
 
     starttime = time.time()
-    find_new_path(1,start,goal,env_config,active_paths,visualize=False)
-    print('time used = ' + str(time.time() - starttime))
+    find_new_path(1,start,goal,env_config,active_paths,visualize=args.visualize)
+    # print('time used = ' + str(time.time() - starttime))
+    
+    # starttime = time.time()
+    # find_new_path(2,start,goal,env_config,active_paths,visualize=args.visualize)
+    # print('time used = ' + str(time.time() - starttime))
 
-    starttime = time.time()
-    find_new_path(2,start,goal,env_config,active_paths,visualize=False)
-    print('time used = ' + str(time.time() - starttime))
+    # starttime = time.time()
+    # find_new_path(3,start,goal,env_config,active_paths,visualize=args.visualize)
+    # print('time used = ' + str(time.time() - starttime))
 
-    starttime = time.time()
-    find_new_path(3,start,goal,env_config,active_paths,visualize=False)
-    print('time used = ' + str(time.time() - starttime))
+    # start = np.array([2.0, 2.0, 5.0])
+    # goal = np.array([6.0, 16.0, 5.0])
 
-    starttime = time.time()
-    find_new_path(4,start,goal,env_config,active_paths,visualize=args.visualize)
-    print('time used = ' + str(time.time() - starttime))
+    # starttime = time.time()
+    # find_new_path(4,start,goal,env_config,active_paths,visualize=args.visualize)
+    # print('time used = ' + str(time.time() - starttime))
+
