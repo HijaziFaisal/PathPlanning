@@ -45,8 +45,8 @@ class rrt_connect():
         self.E = set()
         self.i = 0
         self.maxiter = 10000
-        # self.stepsize = 0.0005 #FIXME: use this instead
-        self.stepsize = 0.5 
+        self.stepsize = 0.0005 #FIXME: use this instead
+        # self.stepsize = 0.5 
         self.Path = []
         self.done = False
 
@@ -121,7 +121,7 @@ class rrt_connect():
             if self.EXTEND(Tree_A, qrand) != 'Trapped':
                 qnew = self.qnew # get qnew from outside
                 if self.CONNECT(Tree_B, qnew) == 'Reached':
-                    # print('reached')
+                    print('reached')
                     self.done = True
                     self.Path = self.PATH(Tree_A, Tree_B)
                     if visualize:
@@ -187,15 +187,15 @@ class rrt_connect():
             ax.set_axis_off()
             plt.pause(0.0001)
 
-
+LAYER_BORDER = 0.002
 def flatten(coords):
     output = {'coordinates': []} 
     coordinates = []
     for i in coords:
         felement, _ = i
         longitude, latitude, altitude = felement
-        # if(altitude >= 0.1): altitude = 15.0
-        # else: altitude = 10.0 
+        if(altitude >= LAYER_BORDER): altitude = 15.0
+        else: altitude = 10.0 
         coordinates.append([longitude,latitude,altitude])
     output['coordinates'] = coordinates
     #return patha + pathb
@@ -251,20 +251,28 @@ def find_new_path(droneID,start,goal,env_config,active_paths,visualize=False):
     """
     #modify active paths 
     
-    DRONE_EXTENTS = 0.2
-    ZLAYER_HEIGHT = 0.5
-    PADDING = 0.1
+    DRONE_EXTENTS = 0.00001
+    ORIGINAL_ZLAYER_HEIGHT = 0.0005
+    PADDING = 0.0000025
     env_config = deepcopy(env_config)
 
     for droneId, path in active_paths.items():
         for p1, p2 in pairwise_overlap(path):
+            ZLAYER_HEIGHT = ORIGINAL_ZLAYER_HEIGHT
             x1, y1, z1 = p1
             x2, y2, z2 = p2
             dx = x2 - x1
             dy = y2 - y1
             px = (x1 + x2)/2
             py = (y1 + y2)/2
-            pz = (z1 + z2)/2-PADDING/2
+            if (z1 != z2):
+                ZLAYER_HEIGHT = 2*ZLAYER_HEIGHT
+                pz = LAYER_BORDER
+            elif (z1 == 10 and z2 == 10):
+                pz = LAYER_BORDER - LAYER_BORDER/2
+            else:
+                pz = LAYER_BORDER + LAYER_BORDER/2
+            # pz = (z1 + z2)/2-PADDING/2
             #TODO: pathfinder output should have discrete z
             ex = np.sqrt(dx**2 + dy**2)/2
             ox = np.arctan(dy / (dx+0.00001*np.sign(dx)))
@@ -276,7 +284,7 @@ def find_new_path(droneID,start,goal,env_config,active_paths,visualize=False):
     p = rrt_connect(start, goal, env_config)
     p.RRT_CONNECT_PLANNER(p.qinit, p.qgoal, visualize=visualize)
     coords_flattened = flatten(p.Path)
-    # print('path     :', coords_flattened)
+    print('path     :', coords_flattened)
     # coords_flattened = coords_flattened[2:-2]
     remove_redundant_points(coords_flattened)
     # print('pathundup:', coords_flattened)
@@ -295,8 +303,8 @@ if __name__ == '__main__':
     from copy import deepcopy
     with open(args.env_config, 'r') as f:
         env_config = json.load(f)
-    start = np.array([2.0, 2.0, 2.0])
-    goal = np.array([6.0, 16.0, 0.0])
+    start = np.array([50.14791780970347, 26.31010265965604,0.001])
+    goal = np.array([50.14747320140165, 26.309417648842725,0.001])
 
 
     active_paths = {
@@ -305,11 +313,11 @@ if __name__ == '__main__':
 
     starttime = time.time()
     find_new_path(1,start,goal,env_config,active_paths,visualize=args.visualize)
-    # print('time used = ' + str(time.time() - starttime))
+    print('time used = ' + str(time.time() - starttime))
     
-    # starttime = time.time()
-    # find_new_path(2,start,goal,env_config,active_paths,visualize=args.visualize)
-    # print('time used = ' + str(time.time() - starttime))
+    starttime = time.time()
+    find_new_path(2,[50.147340831840665, 26.309959188165520,0.001], [50.14751262138688, 26.30976536826546,0.001],env_config,active_paths,visualize=args.visualize)
+    print('time used = ' + str(time.time() - starttime))
 
     # starttime = time.time()
     # find_new_path(3,start,goal,env_config,active_paths,visualize=args.visualize)
