@@ -7,14 +7,12 @@ import numpy as np
 from numpy.matlib import repmat
 from collections import defaultdict
 import time
-# import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 
 import os
 import sys
-from sqlalchemy import false
 
-from sympy import Id, Point3D, Segment3D
-from copy import deepcopy
+from sympy import Id
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/../../Sampling_based_Planning/")
 
@@ -47,7 +45,7 @@ class rrt_connect():
         self.E = set()
         self.i = 0
         self.maxiter = 10000
-        self.stepsize = 0.000125 #FIXME: use this instead
+        self.stepsize = 0.0005 #FIXME: use this instead
         # self.stepsize = 0.5 
         self.Path = []
         self.done = False
@@ -62,7 +60,7 @@ class rrt_connect():
         self.done = False
         
         self.ind = 0
-        # self.fig = plt.figure(figsize=(10, 8))
+        self.fig = plt.figure(figsize=(10, 8))
 
 
 #----------Normal RRT algorithm
@@ -126,14 +124,14 @@ class rrt_connect():
                     print('reached')
                     self.done = True
                     self.Path = self.PATH(Tree_A, Tree_B)
-                    # if visualize:
-                    #     self.visualization(Tree_A, Tree_B, k)
-                    #     # plt.show()
+                    if visualize:
+                        self.visualization(Tree_A, Tree_B, k)
+                        plt.show()
                     return
                     # return
             Tree_A, Tree_B = self.SWAP(Tree_A, Tree_B)
-            # if visualize:
-            #     self.visualization(Tree_A, Tree_B, k)
+            if visualize:
+                self.visualization(Tree_A, Tree_B, k)
         return 'Failure'
 
     # def PATH(self, tree_a, tree_b):
@@ -159,6 +157,35 @@ class rrt_connect():
         return list(reversed(patha)) + pathb
 
 #----------RRT connect algorithm        
+    def visualization(self, tree_a, tree_b, index):
+        if (index % 20 == 0 and index != 0) or self.done:
+            # a_V = np.array(tree_a.V)
+            # b_V = np.array(tree_b.V)
+            Path = self.Path
+            start = self.env.start
+            goal = self.env.goal
+            a_edges, b_edges = [], []
+            for i in tree_a.Parent:
+                a_edges.append([i,tree_a.Parent[i]])
+            for i in tree_b.Parent:
+                b_edges.append([i,tree_b.Parent[i]])
+            ax = plt.subplot(111, projection='3d')
+            ax.view_init(elev=90., azim=0.)
+            ax.clear()
+            draw_Spheres(ax, self.env.balls)
+            draw_block_list(ax, self.env.blocks)
+            if self.env.OBB is not None:
+                draw_obb(ax, self.env.OBB)
+            draw_block_list(ax, np.array([self.env.boundary]), alpha=0)
+            draw_line(ax, a_edges, visibility=0.75, color='g')
+            draw_line(ax, b_edges, visibility=0.75, color='y')
+            draw_line(ax, Path, color='r')
+            ax.plot(start[0:1], start[1:2], start[2:], 'go', markersize=7, markeredgecolor='k')
+            ax.plot(goal[0:1], goal[1:2], goal[2:], 'ro', markersize=7, markeredgecolor='k')
+            set_axes_equal(ax)
+            make_transparent(ax)
+            ax.set_axis_off()
+            plt.pause(0.0001)
 
 LAYER_BORDER = 0.002
 def flatten(coords):
@@ -181,7 +208,8 @@ def pairwise_overlap(iterable):
     next(b)
     return zip(a, b)
 
-def triwise_overlap(iterable):
+#Function that iterates over three elements at a time(Used to simplify the remove redundant points)
+def triwise_overlap(iterable):                                 
     "s -> (s0, s1), (s1, s2), (s2, s3), ..."
     assert len(iterable) > 2
     a = iter(iterable)
@@ -192,26 +220,32 @@ def triwise_overlap(iterable):
     next(c)
     return zip(a, b, c)
 
-def remove_redundant_points(path):
+def remove_redundant_points(path):   #Could possibly be improved using linear regression 
     """
     mutates (modifies) the `path` variable, removes redundant points
     """
-    if len(path) <= 3:
+    if len(path) <= 3:                                         
+    #Return if there are two points or less(No redundant points)
         return
     def angle(p1,p2):
         x1,y1,z1 = p1
         x2,y2,z2 = p2
-        dx = x2 - x1
-        dy = y2 - y1
-        return np.arctan(dy/(dx + 0.00001*np.sign(dx)))
+        dx = x2 - x1    #dx = change in x
+        dy = y2 - y1    #dy = change in y
+        #Find the angle in degrees for the line between points p1 and p2
+        return np.arctan(dy/(dx + 0.00001*np.sign(dx)))         
     indexes_to_remove = []
     for i,(p1,p2,p3) in enumerate(triwise_overlap(path)):
-        if np.abs(angle(p1,p2) - angle(p1,p3)) <= 0.05:
-            indexes_to_remove.append(i+1)
+        #Compare the angle between (p1,p2) and (p1,p3)
+        if np.abs(angle(p1,p2) - angle(p1,p3)) <= 5:            
+        #Add index of midpoint p2 if points p1,p2,p3 are deemed to be in a straight line to list of points to be removed
+            indexes_to_remove.append(i+1)                       
 
-    for i in reversed(indexes_to_remove):
+    #Remove elements that have been previously deemed redundant
+    for i in reversed(indexes_to_remove):                       
         # print(i)
         del path[i]
+
 
 def find_new_path(droneID,start,goal,env_config,active_paths,visualize=False):
     """
@@ -254,42 +288,55 @@ def find_new_path(droneID,start,goal,env_config,active_paths,visualize=False):
 
     # create rrt connect class
     p = rrt_connect(start, goal, env_config)
-    p.RRT_CONNECT_PLANNER(p.qinit, p.qgoal, visualize=visualize)
+    #run the RRT_Connect algorithm
+    p.RRT_CONNECT_PLANNER(p.qinit, p.qgoal, visualize=visualize)    
+    #Modify output to fit desired format
     coords_flattened = flatten(p.Path)
     print('path     :', coords_flattened)
     # coords_flattened = coords_flattened[2:-2]
+    #Remove redundant points that are in a straight or semi-straght line
     remove_redundant_points(coords_flattened)
     # print('pathundup:', coords_flattened)
+    #Add the new flight path to the active flight paths array
     active_paths[droneID] = coords_flattened
     return coords_flattened
 
-def check_intersects(curren_path, other_paths):
-    curren_path = deepcopy(curren_path)
-    current_path_segments = []
-    for i in range(len(curren_path)-1):
-        p1 = Point3D(curren_path[i][0], curren_path[i][1], curren_path[i][2])
-        p2 = Point3D(curren_path[i+1][0], curren_path[i+1][1], curren_path[i+1][2])
-        current_path_segments.append(Segment3D(p1, p2))
+if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('env_config',
+                        help='path to json file containing environment objects')
+    parser.add_argument('-v', '--visualize', action='store_true')
+    args = parser.parse_args()
 
-    other_paths_segments = []
-    if other_paths:
-        for path in other_paths:
-            path_seqments = []
-            for i in range(len(path['flight_path']['coordinates'])-1):
-                p1 = Point3D(path['flight_path']['coordinates'][i][0], path['flight_path']['coordinates'][i][1], path['flight_path']['coordinates'][i][2])
-                p2 = Point3D(path['flight_path']['coordinates'][i+1][0], path['flight_path']['coordinates'][i+1][1], path['flight_path']['coordinates'][i+1][2])
-                path_seqments.append(Segment3D(p1, p2))
-            other_paths_segments.append(path_seqments)
+    import json
+    from copy import deepcopy
+    with open(args.env_config, 'r') as f:
+        env_config = json.load(f)
+    start = np.array([50.14791780970347, 26.31010265965604,0.001])
+    goal = np.array([50.14747320140165, 26.309417648842725,0.001])
 
-    for i in range(len(current_path_segments)):
-        for j in range(len(other_paths_segments)):
-            for k in range(len(other_paths_segments[j])):
-                try:
-                    if current_path_segments[i].intersection(other_paths_segments[j][k]):
-                        curren_path[i][2] = 15
-                        curren_path[i+1][2] = 15
-                finally:
-                    break
+
+    active_paths = {
+        # 0: [[5.862774675369044, 14.811551134482752, 1.0], [5.7252361071054585, 14.334534696199228, 1.0], [5.587697538841872, 13.857518257915702, 1.0], [5.450158970578285, 13.380501819632176, 1.0], [5.312620402314699, 12.90348538134865, 1.0], [5.175081834051113, 12.426468943065125, 1.0], [5.0375432657875265, 11.9494525047816, 1.0], [4.90000469752394, 11.472436066498075, 1.0], [4.762466129260353, 10.995419628214549, 1.0], [4.624927560996767, 10.518403189931025, 1.0], [4.48738899273318, 10.0413867516475, 1.0], [4.349850424469594, 9.564370313363977, 1.0], [4.212311856206007, 9.087353875080451, 1.0], [4.0747732879424206, 8.610337436796925, 1.0], [3.937234719678834, 8.1333209985134, 1.0], [3.7996961514152474, 7.6563045602298745, 1.0], [3.6621575831516613, 7.17928812194635, 1.0], [3.5246190148880747, 6.702271683662825, 1.0], [3.3870804466244886, 6.2252552453793, 1.0], [3.249541878360902, 5.748238807095775, 1.0], [3.1120033100973155, 5.27122236881225, 1.0], [2.9744647418337293, 4.794205930528725, 1.0], [2.836926173570143, 4.3171894922452, 1.0], [2.6993876053065566, 3.8401730539616756, 1.0], ],
+    }
+
+    starttime = time.time()
+    find_new_path(1,start,goal,env_config,active_paths,visualize=args.visualize)
+    print('time used = ' + str(time.time() - starttime))
     
-    return curren_path
+    starttime = time.time()
+    find_new_path(2,[50.147340831840665, 26.309959188165520,0.001], [50.14751262138688, 26.30976536826546,0.001],env_config,active_paths,visualize=args.visualize)
+    print('time used = ' + str(time.time() - starttime))
+
+    # starttime = time.time()
+    # find_new_path(3,start,goal,env_config,active_paths,visualize=args.visualize)
+    # print('time used = ' + str(time.time() - starttime))
+
+    # start = np.array([2.0, 2.0, 5.0])
+    # goal = np.array([6.0, 16.0, 5.0])
+
+    # starttime = time.time()
+    # find_new_path(4,start,goal,env_config,active_paths,visualize=args.visualize)
+    # print('time used = ' + str(time.time() - starttime))
 
